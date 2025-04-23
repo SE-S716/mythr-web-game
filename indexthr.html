@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>城邦演进录 - 完整版</title>
+    <style>
+        :root {
+            --primary-blue: #2c3e50;
+            --accent-gold: #f1c40f;
+            --success-green: #27ae60;
+            --danger-red: #e74c3c;
+            --light-bg: #ecf0f1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, '微软雅黑', sans-serif;
+            background: linear-gradient(135deg, #bdc3c7, #2c3e50);
+            color: #2c3e50;
+            line-height: 1.6;
+            margin: 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            width: 100%;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        #start-screen {
+            text-align: center;
+            padding: 2rem 1rem;
+            transition: opacity 0.3s;
+        }
+
+        #start-btn {
+            background: var(--primary-blue);
+            color: white;
+            padding: 1.5rem;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.5rem;
+            width: 80%;
+            max-width: 300px;
+            margin: 2rem auto;
+            display: block;
+            touch-action: manipulation;
+            transition: transform 0.1s;
+        }
+
+        #start-btn:active {
+            transform: scale(0.95);
+        }
+
+        #game-screen {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .era-card {
+            background: white;
+            border: 3px solid var(--primary-blue);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .options-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+        }
+
+        .option-card {
+            background: var(--light-bg);
+            border: 2px solid var(--primary-blue);
+            border-radius: 8px;
+            padding: 1.5rem;
+            touch-action: manipulation;
+            transition: all 0.2s;
+        }
+
+        .option-card:active {
+            transform: scale(0.98);
+            background: var(--accent-gold);
+        }
+
+        .timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--danger-red);
+            color: white;
+            padding: 1rem;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 15px rgba(231,76,60,0.5);
+        }
+
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(41,128,185,0.1);
+            border-radius: 8px;
+        }
+
+        @media (min-width: 600px) {
+            .game-container {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 2rem;
+            }
+            .options-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .stats-panel {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div id="start-screen">
+            <h1>城邦演进录</h1>
+            <div class="game-rules">
+                <h2>📜 市长守则</h2>
+                <p>您将带领城市经历三个关键时期，每个决策都将影响：</p>
+                <ul>
+                    <li>💰 经济发展走向</li>
+                    <li>⚙️ 技术演进路径</li>
+                    <li>🌍 国际关系格局</li>
+                </ul>
+                <button id="start-btn">开始治理</button>
+            </div>
+        </div>
+
+        <div id="game-screen">
+            <div class="timer" id="timer">60</div>
+            <div class="stats-panel" id="stats"></div>
+            <div id="event-display"></div>
+            <div class="options-grid" id="options"></div>
+            <div id="result-display"></div>
+        </div>
+    </div>
+
+<script>
+const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+class CityEvolution {
+    constructor() {
+        this.era = 1;
+        this.stats = {
+            economy: 50,
+            tech: 40,
+            diplomacy: 45,
+            stability: 60
+        };
+        this.history = [];
+        this.events = [
+            {
+                title: "银元之战（1949）",
+                desc: "投机商操纵金融市场，物价指数飙涨...",
+                options: this.generateOptions(1)
+            },
+            {
+                title: "技术合作危机（1958）",
+                desc: "外国要求核心技术共享...",
+                options: this.generateOptions(2)
+            },
+            {
+                title: "芯片封锁（2023）",
+                desc: "核心元器件遭全面禁运...",
+                options: this.generateOptions(3)
+            }
+        ];
+    }
+
+    generateOptions(era) {
+        const options = [];
+        const optionDB = {
+            1: {
+                texts: ["军事管制", "货币改革", "双轨制", "国际借贷", "配给制度"],
+                effects: [
+                    { economy: +15, stability: -20 },
+                    { economy: -20, diplomacy: +10 },
+                    { economy: +10, stability: +10 },
+                    { diplomacy: -25, tech: +20 },
+                    { stability: +20, tech: -15 }
+                ]
+            },
+            2: {
+                texts: ["全面合作", "自主攻坚", "拖延策略", "民技军用", "第三方突破"],
+                effects: [
+                    { tech: +35, diplomacy: -40 },
+                    { tech: +25, economy: -30 },
+                    { diplomacy: +10, stability: -15 },
+                    { tech: +15, stability: +20 },
+                    { diplomacy: -10, economy: -20 }
+                ]
+            },
+            3: {
+                texts: ["举国攻坚", "迂回采购", "生态重构", "开放妥协", "法律反击"],
+                effects: [
+                    { tech: +40, economy: -35 },
+                    { tech: +25, diplomacy: -20 },
+                    { stability: +30, tech: -25 },
+                    { diplomacy: +35, stability: -20 },
+                    { diplomacy: +30, economy: -25 }
+                ]
+            }
+        };
+
+        for (let i = 0; i < 5; i++) {
+            options.push({
+                id: `E${era}O${i+1}`,
+                text: optionDB[era].texts[i],
+                effects: optionDB[era].effects[i],
+                cost: ""
+            });
+        }
+        return this.shuffle(options);
+    }
+
+    shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    applyChoice(option) {
+        Object.entries(option.effects).forEach(([key, val]) => {
+            this.stats[key] = Math.max(0, Math.min(100, this.stats[key] + val));
+        });
+        this.history.push(option.id);
+        this.era++;
+    }
+}
+
+class GameUI {
+    constructor() {
+        this.game = new CityEvolution();
+        this.timerId = null;
+        this.initDOM();
+        this.initEventListeners();
+    }
+
+    initDOM() {
+        this.startScreen = document.getElementById('start-screen');
+        this.gameScreen = document.getElementById('game-screen');
+        this.timerElement = document.getElementById('timer');
+        this.optionsContainer = document.getElementById('options');
+        this.eventDisplay = document.getElementById('event-display');
+        this.statsPanel = document.getElementById('stats');
+    }
+
+    initEventListeners() {
+        const startBtn = document.getElementById('start-btn');
+        const handleStart = (e) => {
+            e.preventDefault();
+            this.startGame();
+        };
+
+        if (isMobile) {
+            startBtn.addEventListener('touchstart', handleStart, { passive: false });
+        }
+        startBtn.addEventListener('click', handleStart);
+    }
+
+    startGame() {
+        this.startScreen.style.opacity = '0';
+        this.gameScreen.style.display = 'block';
+        setTimeout(() => {
+            this.gameScreen.style.opacity = '1';
+            this.showNextEvent();
+        }, 300);
+    }
+
+    showNextEvent() {
+        if (this.game.era > 3) return this.showFinalResult();
+        
+        const currentEvent = this.game.events[this.game.era - 1];
+        this.displayEvent(currentEvent);
+        this.startTimer();
+    }
+
+    displayEvent(event) {
+        this.eventDisplay.innerHTML = `
+            <div class="era-card">
+                <h2>${event.title}</h2>
+                <p>${event.desc}</p>
+            </div>
+        `;
+        this.renderOptions(event.options);
+        this.updateStats();
+    }
+
+    renderOptions(options) {
+        this.optionsContainer.innerHTML = options.map(opt => `
+            <div class="option-card" data-id="${opt.id}">
+                <h3>${opt.text}</h3>
+                <p>影响：${this.formatEffects(opt.effects)}</p>
+            </div>
+        `).join('');
+
+        this.optionsContainer.querySelectorAll('.option-card').forEach(card => {
+            const handler = (e) => {
+                e.preventDefault();
+                this.handleChoice(card.dataset.id);
+            };
+            card.addEventListener(isMobile ? 'touchstart' : 'click', handler);
+        });
+    }
+
+    handleChoice(optionId) {
+        clearInterval(this.timerId);
+        const option = this.game.events[this.game.era - 1].options.find(opt => opt.id === optionId);
+        this.game.applyChoice(option);
+        this.showResult(`✅ 已实施：${option.text}`);
+        setTimeout(() => this.showNextEvent(), 1500);
+    }
+
+    startTimer() {
+        let time = 60;
+        this.timerElement.textContent = time;
+        
+        this.timerId = setInterval(() => {
+            time--;
+            this.timerElement.textContent = time;
+            if (time <= 0) this.handleTimeout();
+        }, 1000);
+    }
+
+    handleTimeout() {
+        clearInterval(this.timerId);
+        this.game.stats.stability -= 15;
+        this.showResult('⏰ 犹豫不决导致市民信心下降！');
+        this.game.era++;
+        setTimeout(() => this.showNextEvent(), 2000);
+    }
+
+    formatEffects(effects) {
+        return Object.entries(effects).map(([k, v]) => 
+            `${this.getStatName(k)} ${v > 0 ? '+' : ''}${v}%`
+        ).join(', ');
+    }
+
+    updateStats() {
+        this.statsPanel.innerHTML = Object.entries(this.game.stats)
+            .map(([key, value]) => `
+                <div class="stat-item">
+                    <div>${this.getStatName(key)}</div>
+                    <div style="margin-top:5px;">
+                        <div style="
+                            width: ${value}%;
+                            height: 8px;
+                            background: ${this.getBarColor(value)};
+                            border-radius: 4px;
+                            transition: width 0.5s ease">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    getStatName(key) {
+        const names = { economy: '经济', tech: '技术', diplomacy: '外交', stability: '稳定' };
+        return names[key];
+    }
+
+    getBarColor(value) {
+        if (value >= 75) return '#27ae60';
+        if (value >= 40) return '#f1c40f';
+        return '#e74c3c';
+    }
+
+    showResult(message) {
+        const resultEl = document.createElement('div');
+        resultEl.className = 'era-card';
+        resultEl.innerHTML = `<h3>${message}</h3>`;
+        this.eventDisplay.appendChild(resultEl);
+        this.updateStats();
+    }
+
+    showFinalResult() {
+        let resultText = '<h2>🏙️ 最终结果</h2>';
+        if (this.game.stats.tech >= 80) {
+            resultText += '<p>🎉 成就科技强国！</p>';
+        } else if (this.game.stats.economy >= 75) {
+            resultText += '<p>💰 建成经济强市</p>';
+        } else {
+            resultText += '<p>🏳️ 城市发展陷入停滞</p>';
+        }
+        
+        this.eventDisplay.innerHTML = `
+            <div class="era-card">
+                ${resultText}
+                <p>发展路径：${this.game.history.join(' → ')}</p>
+                <button id="restart-btn" style="margin-top:1rem">重新开始</button>
+            </div>
+        `;
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            location.reload();
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.ui = new GameUI();
+});
+</script>
+</body>
+</html>
